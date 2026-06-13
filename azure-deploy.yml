@@ -1,0 +1,15 @@
+# Azure Web App configuration for container deployment
+# Run: az webapp create --resource-group <rg> --plan <plan> --name <app-name> --deployment-container-image-name ghcr.io/<owner>/image-captioning-api:latest
+
+parameters:
+  resourceGroup: image-captioning-rg
+  location: eastus
+  appServicePlan: caption-plan
+  webAppName: image-captioning-api          # Change to a globally unique name
+  sku: B2                                   # B2 = 2 vCPU, 3.5 GB RAM (minimum for TF)
+  containerImage: ghcr.io/OWNER/image-captioning-api:latest
+
+settings:
+  WEBSITES_PORT: "5000"
+  WEBSITES_ENABLE_APP_SERVICE_STORAGE: "false"
+  DOCKER_ENABLE_CI: "true"

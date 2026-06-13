@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Image Captioning Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0f0f1a; color: #e0e0e0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem; }
+    h1 { font-size: 2rem; margin-bottom: 0.25rem; background: linear-gradient(135deg, #6c63ff, #48c9b0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { color: #888; margin-bottom: 2rem; font-size: 0.9rem; }
+    .card { background: #1a1a2e; border-radius: 16px; padding: 2rem; width: 100%; max-width: 600px; box-shadow: 0 8px 32px rgba(108,99,255,0.15); }
+    .drop-zone { border: 2px dashed #6c63ff; border-radius: 12px; padding: 3rem; text-align: center; cursor: pointer; transition: background 0.2s; margin-bottom: 1.5rem; }
+    .drop-zone:hover, .drop-zone.drag-over { background: rgba(108,99,255,0.1); }
+    .drop-zone input { display: none; }
+    .drop-zone p { color: #888; margin-top: 0.5rem; font-size: 0.85rem; }
+    #preview { max-width: 100%; max-height: 300px; border-radius: 8px; margin: 1rem auto; display: block; }
+    .controls { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
+    select, button { padding: 0.6rem 1.2rem; border-radius: 8px; border: none; font-size: 0.9rem; cursor: pointer; }
+    select { background: #2a2a3e; color: #e0e0e0; border: 1px solid #6c63ff44; }
+    button { background: linear-gradient(135deg, #6c63ff, #48c9b0); color: white; font-weight: 600; transition: opacity 0.2s; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .result { background: #0f0f1a; border-radius: 10px; padding: 1.2rem; min-height: 60px; font-size: 1.1rem; line-height: 1.6; border-left: 3px solid #6c63ff; }
+    .result.loading { color: #888; font-style: italic; }
+    .result.error { border-left-color: #e74c3c; color: #e74c3c; }
+    .meta { margin-top: 0.5rem; font-size: 0.75rem; color: #666; }
+    .icon { font-size: 2.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Image Captioning</h1>
+  <p class="subtitle">CNN-LSTM with Bahdanau Attention · InceptionV3 · BLEU-1: 0.49</p>
+  <div class="card">
+    <div class="drop-zone" id="dropZone">
+      <div class="icon">🖼️</div>
+      <p>Click or drag &amp; drop an image</p>
+      <p>PNG / JPG / WEBP · max 10 MB</p>
+      <input type="file" id="fileInput" accept="image/*"/>
+    </div>
+    <img id="preview" style="display:none"/>
+    <div class="controls">
+      <select id="strategy">
+        <option value="greedy">Greedy decoding</option>
+        <option value="beam">Beam search (k=3)</option>
+      </select>
+      <button id="captionBtn" disabled>Generate Caption</button>
+    </div>
+    <div class="result" id="result">Upload an image to get started.</div>
+    <div class="meta" id="meta"></div>
+  </div>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+    const captionBtn = document.getElementById('captionBtn');
+    const resultEl = document.getElementById('result');
+    const metaEl = document.getElementById('meta');
+    const strategy = document.getElementById('strategy');
+    let selectedFile = null;
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
+    fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+
+    function handleFile(file) {
+      if (!file) return;
+      selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = e => { preview.src = e.target.result; preview.style.display = 'block'; };
+      reader.readAsDataURL(file);
+      captionBtn.disabled = false;
+      resultEl.className = 'result';
+      resultEl.textContent = 'Ready. Click "Generate Caption".';
+      metaEl.textContent = '';
+    }
+
+    captionBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      captionBtn.disabled = true;
+      resultEl.className = 'result loading';
+      resultEl.textContent = 'Generating caption...';
+      metaEl.textContent = '';
+
+      const formData = new FormData();
+      formData.append('image', selectedFile);
+
+      try {
+        const res = await fetch(`/predict?strategy=${strategy.value}&beam_width=3`, {
+          method: 'POST', body: formData
+        });
+        const data = await res.json();
+        if (res.ok) {
+          resultEl.className = 'result';
+          resultEl.textContent = data.caption || '(no caption)';
+          metaEl.textContent = `Latency: ${data.latency_ms} ms · Strategy: ${data.strategy}`;
+        } else {
+          resultEl.className = 'result error';
+          resultEl.textContent = data.error || 'Unknown error';
+        }
+      } catch (err) {
+        resultEl.className = 'result error';
+        resultEl.textContent = 'Network error: ' + err.message;
+      } finally {
+        captionBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
