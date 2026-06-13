@@ -1,10 +1,7 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:  # manual trigger only — enable push/PR triggers when Azure secrets are ready
 
 env:
   REGISTRY: ghcr.io
